@@ -3,6 +3,7 @@ import db from "../db";
 import { application, employee, job } from "../db/schema";
 import { eq, desc } from "drizzle-orm";
 import { hashPassword } from "../services/auth.service";
+import { uploadToS3 } from "../utils/s3Client";
 
 export const registerEmployee = async (req: Request, res: Response) => {
   const { name, email, password, jobTitle, mobileNumber, location, resume } =
@@ -59,24 +60,6 @@ export const getEmployeeProfile = async (req: Request, res: Response) => {
   }
 };
 
-export const updateEmployeeProfile = async (req: Request, res: Response) => {
-  const employeeId = req.user?.id;
-  const { name, mobileNumber, location, jobTitle, resume } = req.body;
-  console.log({ name, mobileNumber, location, jobTitle, resume })
-  if (!employeeId) {
-    return res.status(401).json({ isSuccess: false, message: "Unauthorized" });
-  }
-
-  try {
-    const result = await db.update(employee).set({ name, jobTitle, mobileNumber, location, resume }).where(eq(employee.id, employeeId));
-
-    res.json({ isSuccess: true, message: "Profile updated successfully", user: result });
-  } catch (error) {
-    console.error("Error updating employer profile:", error);
-    res.json({ isSuccess: false, message: "Profile update failed" });
-  }
-};
-
 export const getEmployeeApplications = async (req: Request, res: Response) => {
   const employeeId = req.user?.id;
 
@@ -104,5 +87,55 @@ export const getEmployeeApplications = async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Error fetching employee applications:", error);
     res.status(500).json({ error: "Failed to fetch employee applications" });
+  }
+};
+
+export const updateEmployeeProfile = async (req: Request, res: Response) => {
+  const employeeId = req.user?.id;
+
+  if (!employeeId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  try {
+    const { name, jobTitle, location, mobileNumber } = req.body;
+
+    const updateData: Partial<typeof employee.$inferInsert> = {};
+
+    if (name !== undefined) updateData.name = name;
+    if (jobTitle !== undefined) updateData.jobTitle = jobTitle;
+    if (location !== undefined) updateData.location = location;
+    if (mobileNumber !== undefined) updateData.mobileNumber = mobileNumber;
+
+    if (req.file) {
+      try {
+        const fileExtension = req.file.originalname.split(".").pop();
+        const fileName = `${employeeId}-${Date.now()}.${fileExtension}`;
+        const resumeKey = `resumes/${employeeId}/${fileName}`;
+
+        await uploadToS3(req.file.buffer, resumeKey, req.file.mimetype);
+        updateData.resume = resumeKey;
+      } catch (error) {
+        console.error("Error uploading file to S3:", error);
+        return res.status(500).json({ error: "Failed to upload resume" });
+      }
+    }
+
+    if (Object.keys(updateData).length > 0) {
+      await db
+        .update(employee)
+        .set(updateData)
+        .where(eq(employee.id, employeeId));
+    } else {
+      return res.status(400).json({ error: "No data provided for update" });
+    }
+
+    res.json({
+      message: "Profile updated successfully",
+      resumeKey: updateData.resume,
+    });
+  } catch (error) {
+    console.error("Error updating employee profile:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 };

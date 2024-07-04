@@ -23,7 +23,6 @@ import {
   SelectValue,
 } from '../components/ui/select'
 import api from '../lib/api'
-import { uploadToS3 } from '../lib/s3Bucket'
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024 // 2MB
 const ACCEPTED_FILE_TYPES = [
@@ -33,7 +32,8 @@ const ACCEPTED_FILE_TYPES = [
 
 export default function EmployeeOnBoarding() {
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, setUser } = useAuth()
+
   const employeeFormSchema = z.object({
     name: z.string().min(1, { message: 'Employee name cannot be empty' }),
     jobTitle: z.enum(
@@ -79,43 +79,44 @@ export default function EmployeeOnBoarding() {
 
   async function onSubmit(values: z.infer<typeof employeeFormSchema>) {
     try {
-      let resumeUrl = ''
+      let formData = new FormData()
+      formData.append('name', values.name)
+      formData.append('jobTitle', values.jobTitle)
+      formData.append('location', values.location)
+      formData.append('mobileNumber', values.mobileNumber)
+
       if (values.resume && values.resume.length > 0) {
-        resumeUrl = await uploadToS3(values.resume[0])
+        formData.append('resume', values.resume[0])
       }
 
-      const res = await api.put('/employee/profile', {
-        name: values.name,
-        jobTitle: values.jobTitle,
-        location: values.location,
-        mobileNumber: values.mobileNumber,
-        resumeUrl: resumeUrl, // Add this line
+      const res = await api.put('/employee/profile', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
       })
 
       console.log(res)
-      let info: any = sessionStorage.getItem('user')
-      let data: User = JSON.parse(info)
-      const user = {
-        id: data.id,
-        name: values.name,
-        email: data.email,
-        type: data.type,
-        location: data.location,
-        mobileNumber: data.mobileNumber,
-        resumeUrl: resumeUrl, // Add this line
+
+      if (user) {
+        const updatedUser: User = {
+          ...user,
+          name: values.name,
+          jobTitle: values.jobTitle,
+          location: values.location,
+          mobileNumber: values.mobileNumber,
+          resume: res.data.resumeKey,
+        }
+
+        setUser(updatedUser)
+        sessionStorage.setItem('user', JSON.stringify(updatedUser))
       }
 
-      sessionStorage.setItem('user', JSON.stringify(user))
-      if (user.type === 'employee') {
-        navigate('/dashboard/employer')
-      } else {
-        navigate('/dashboard/employee')
-      }
+      navigate('/dashboard/employee')
     } catch (error) {
       console.error('Error submitting form:', error)
-      // Handle error (e.g., show error message to user)
     }
   }
+
   return (
     <>
       <div className='absolute right-8 top-8 flex items-center gap-2'>

@@ -1,5 +1,4 @@
 import { Route, Routes, useLocation } from 'react-router-dom'
-import { ProtectedRoute } from '../auth/ProtectedRoute'
 import Navbar from '../components/navbar'
 import NotFound from '../pages/404'
 import CompanyDashboard from '../pages/CompanyDashboard'
@@ -10,7 +9,6 @@ import Login from '../pages/Login'
 import Privacy from '../pages/privacy'
 import Register from '../pages/Register'
 import Terms from '../pages/terms'
-import { useAuth } from '../auth/AuthContext'
 
 export default function Layout() {
   //const { isLoggedIn, navigate, type } = useAuth();
@@ -25,38 +23,10 @@ export default function Layout() {
         <Route path='/' element={<Login />} />
         <Route path='/login' element={<Login />} />
         <Route path='/signup' element={<Register />} />
-        <Route
-          path='/onboarding/employer'
-          element={
-            <ProtectedRoute>
-              <CompanyOnBoarding />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path='/onboarding/employee'
-          element={
-            <ProtectedRoute>
-              <EmployeeOnBoarding />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path='/dashboard/employer'
-          element={
-            <ProtectedRoute>
-              <CompanyDashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path='/dashboard/employee'
-          element={
-            <ProtectedRoute>
-              <EmployeeDashboard />
-            </ProtectedRoute>
-          }
-        />
+        <Route path='/onboarding/employer' element={<CompanyOnBoarding />} />
+        <Route path='/onboarding/employee' element={<EmployeeOnBoarding />} />
+        <Route path='/dashboard/employer' element={<CompanyDashboard />} />
+        <Route path='/dashboard/employee' element={<EmployeeDashboard />} />
         <Route path='/terms' element={<Terms />} />
         <Route path='/privacy' element={<Privacy />} />
         <Route path='*' element={<NotFound />} />

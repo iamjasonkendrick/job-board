@@ -8,10 +8,13 @@ export interface User {
   type: 'employee' | 'employer'
   location: string | null
   mobileNumber: string | null
+  jobTitle?: string | null
+  resume?: string | null
 }
 
 interface AuthContextType {
   user: User | null
+  setUser: React.Dispatch<React.SetStateAction<User | null>>
   accessToken: string | null
   refreshToken: string | null
   login: (email: string, password: string) => Promise<void>
@@ -64,6 +67,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setRefreshToken(null)
       localStorage.removeItem('accessToken')
       localStorage.removeItem('refreshToken')
+      sessionStorage.removeItem('user')
     }
   }
 
@@ -119,6 +123,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     <AuthContext.Provider
       value={{
         user,
+        setUser,
         accessToken,
         refreshToken,
         login,
