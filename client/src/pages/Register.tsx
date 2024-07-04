@@ -1,21 +1,36 @@
 import { useState } from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
+import axios from 'axios'
 import { useForm } from 'react-hook-form'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { z } from 'zod'
 import { LogoWithText } from '../components/logo'
 import { ThemeToggle } from '../components/theme-toggle'
 import { Button } from '../components/ui/button'
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '../components/ui/form'
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '../components/ui/form'
 import { Input } from '../components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select'
 import { Eye, EyeOff } from 'lucide-react'
-import axios from 'axios'
-import { useAuth } from '../auth/AuthContext'
 
 const registerFormSchema = z.object({
   email: z.string().email({ message: 'Please enter a valid email address' }),
-  password: z.string().min(8, { message: 'Password must be at least 8 characters long' }).max(32, { message: 'Password can be 32 characters maximum' }),
+  password: z
+    .string()
+    .min(8, { message: 'Password must be at least 8 characters long' })
+    .max(32, { message: 'Password can be 32 characters maximum' }),
   userType: z.enum(['employer', 'employee'], {
     required_error: 'Please select a user type',
   }),
@@ -23,6 +38,7 @@ const registerFormSchema = z.object({
 
 export default function Register() {
   const [showPassword, setShowPassword] = useState(false)
+  const navigate = useNavigate()
 
   const registerForm = useForm<z.infer<typeof registerFormSchema>>({
     resolver: zodResolver(registerFormSchema),
@@ -39,19 +55,19 @@ export default function Register() {
       const res = await axios.post('http://localhost:5000/api/v1/auth/signup', {
         email,
         password,
-        userType
+        userType,
       })
       console.log(res)
       if (!res.data.isSuccess) {
         console.log(res.data.message)
-        return;
+        return
       }
       console.log(res.data.message)
       const { accessToken, refreshToken } = res.data
       localStorage.setItem('accessToken', accessToken)
       localStorage.setItem('refreshToken', refreshToken)
       console.log(userType)
-      if (userType === "employee") {
+      if (userType === 'employee') {
         navigate('/onboarding/employee')
       } else {
         navigate('/onboarding/employer')

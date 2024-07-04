@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import axios from 'axios'
 
-interface User {
+export interface User {
   id: string
   name: string
   email: string
@@ -34,13 +34,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const login = async (email: string, password: string) => {
     try {
-      const response = await axios.post(
-        'http://localhost:5000/api/v1/auth/login',
-        {
-          email,
-          password,
-        },
-      )
+      const response = await axios.post('/api/v1/auth/login', {
+        email,
+        password,
+      })
       const { accessToken, refreshToken, userResponse } = response.data
       setUser(userResponse)
       setAccessToken(accessToken)
@@ -139,4 +136,4 @@ export const useAuth = () => {
     throw new Error('useAuth must be used within an AuthProvider')
   }
   return context
-} 
+}

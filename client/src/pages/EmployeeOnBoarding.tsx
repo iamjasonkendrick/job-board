@@ -1,14 +1,29 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
+import { useNavigate } from 'react-router-dom'
 import { z } from 'zod'
+import { useAuth, User } from '../auth/AuthContext'
 import { LogoWithText } from '../components/logo'
 import { ThemeToggle } from '../components/theme-toggle'
 import { Button } from '../components/ui/button'
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '../components/ui/form'
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '../components/ui/form'
 import { Input } from '../components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select'
 import api from '../lib/api'
-import { User, useAuth } from '../auth/AuthContext'
+import { uploadToS3 } from '../lib/s3Bucket'
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024 // 2MB
 const ACCEPTED_FILE_TYPES = [
@@ -17,7 +32,8 @@ const ACCEPTED_FILE_TYPES = [
 ]
 
 export default function EmployeeOnBoarding() {
-  const { setType, navigate } = useAuth()
+  const navigate = useNavigate()
+  const { user } = useAuth()
   const employeeFormSchema = z.object({
     name: z.string().min(1, { message: 'Employee name cannot be empty' }),
     jobTitle: z.enum(
@@ -33,15 +49,21 @@ export default function EmployeeOnBoarding() {
         required_error: 'Please select a job title.',
       },
     ),
-    mobileNumber: z.string().regex(/^[0-9]{10}$/, { message: 'Invalid mobile number' }),
+    mobileNumber: z
+      .string()
+      .regex(/^[0-9]{10}$/, { message: 'Invalid mobile number' }),
     location: z.string().min(1, { message: 'Location is required' }),
-    resume: z.any().refine((files) => files?.length == 1, 'Please attach your resume.').refine(
-      (files) => files?.[0]?.size <= MAX_FILE_SIZE,
-      `Max file size is 2MB.`,
-    ).refine(
-      (files) => ACCEPTED_FILE_TYPES.includes(files?.[0]?.type),
-      'Only .pdf and .docx files are accepted.',
-    ),
+    resume: z
+      .any()
+      .refine((files) => files?.length == 1, 'Please attach your resume.')
+      .refine(
+        (files) => files?.[0]?.size <= MAX_FILE_SIZE,
+        `Max file size is 2MB.`,
+      )
+      .refine(
+        (files) => ACCEPTED_FILE_TYPES.includes(files?.[0]?.type),
+        'Only .pdf and .docx files are accepted.',
+      ),
   })
 
   const employeeForm = useForm<z.infer<typeof employeeFormSchema>>({
@@ -56,31 +78,42 @@ export default function EmployeeOnBoarding() {
   })
 
   async function onSubmit(values: z.infer<typeof employeeFormSchema>) {
-    console.log(values)
-    const res = await api.put('/employee/profile', {
-      name: values.name,
-      jobTitle: values.jobTitle,
-      location: values.location,
-      mobileNumber: values.mobileNumber
-    })
-    console.log(res)
-    let info: any = sessionStorage.getItem('user')
-    let data: User = JSON.parse(info)
-    const user = {
-      id: data.id,
-      name: values.name,
-      email: data.email,
-      type: data.type,
-      location: data.location,
-      sector: data.sector,
-      mobileNumber: data.mobileNumber
-    }
-    setType(data.type)
-    sessionStorage.setItem('user', JSON.stringify(user))
-    if (data.type === "employee") {
-      navigate('/dashboard/employer')
-    } else {
-      navigate('/dashboard/employee')
+    try {
+      let resumeUrl = ''
+      if (values.resume && values.resume.length > 0) {
+        resumeUrl = await uploadToS3(values.resume[0])
+      }
+
+      const res = await api.put('/employee/profile', {
+        name: values.name,
+        jobTitle: values.jobTitle,
+        location: values.location,
+        mobileNumber: values.mobileNumber,
+        resumeUrl: resumeUrl, // Add this line
+      })
+
+      console.log(res)
+      let info: any = sessionStorage.getItem('user')
+      let data: User = JSON.parse(info)
+      const user = {
+        id: data.id,
+        name: values.name,
+        email: data.email,
+        type: data.type,
+        location: data.location,
+        mobileNumber: data.mobileNumber,
+        resumeUrl: resumeUrl, // Add this line
+      }
+
+      sessionStorage.setItem('user', JSON.stringify(user))
+      if (user.type === 'employee') {
+        navigate('/dashboard/employer')
+      } else {
+        navigate('/dashboard/employee')
+      }
+    } catch (error) {
+      console.error('Error submitting form:', error)
+      // Handle error (e.g., show error message to user)
     }
   }
   return (
